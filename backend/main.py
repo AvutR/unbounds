@@ -71,14 +71,24 @@ def api_create_user(payload: CreateUser, admin: User = Depends(get_current_user)
 @app.get("/users/me")
 def api_get_current_user(user: User = Depends(get_current_user)):
     """Return basic profile for the authenticated API key."""
-    # Return safe subset of fields (don't return api_key)
-    return {
-        "id": user.id,
-        "username": getattr(user, "name", None) or getattr(user, "username", None) or "user",
-        "role": user.role,
-        "seniority": user.seniority,
-        "credits": user.credits
-    }
+    # Refresh from DB to get latest credits
+    with next(get_session()) as session:
+        fresh_user = session.get(User, user.id)
+        if not fresh_user:
+            return {
+                "id": user.id,
+                "username": user.name or "user",
+                "role": user.role,
+                "seniority": user.seniority,
+                "credits": user.credits
+            }
+        return {
+            "id": fresh_user.id,
+            "username": fresh_user.name or "user",
+            "role": fresh_user.role,
+            "seniority": fresh_user.seniority,
+            "credits": fresh_user.credits
+        }
 
 @app.get("/rules")
 def api_list_rules(user: User = Depends(get_current_user)):

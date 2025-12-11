@@ -8,6 +8,24 @@ export default function Dashboard({apiKey, onLogout}) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
+  const refreshData = async () => {
+    try {
+      const [cmdsRes, userRes] = await Promise.allSettled([
+        client.get("/commands"),
+        client.get("/users/me")
+      ]);
+      if (cmdsRes.status === "fulfilled") setCommands(cmdsRes.value.data || []);
+      if (userRes.status === "fulfilled") setUser(userRes.value.data || null);
+    } catch (e) {
+      console.error("Failed to refresh:", e);
+    }
+  };
+
+  const handleCommandSubmit = async () => {
+    // Refresh both commands and user (credits) after submission
+    await refreshData();
+  };
+
   useEffect(() => {
     const fetchAll = async () => {
       try {
@@ -81,9 +99,7 @@ export default function Dashboard({apiKey, onLogout}) {
         <div style={{ gridColumn: "1 / 2", backgroundColor: "#f8f9fa", border: "1px solid #ddd", borderRadius: "8px", padding: "20px" }}>
           <h2 style={{ marginTop: 0 }}>📤 Submit Command</h2>
           <p style={{ color: "#666", fontSize: "14px" }}>Enter a command to execute. It will be validated against active rules.</p>
-          <CommandForm client={client} onSubmit={() => {
-            client.get("/commands").then(r => setCommands(r.data)).catch(console.error);
-          }} />
+          <CommandForm client={client} onSubmit={handleCommandSubmit} />
         </div>
 
         {/* Credits & Info Card */}
