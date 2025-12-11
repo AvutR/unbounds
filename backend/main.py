@@ -32,6 +32,21 @@ def on_startup():
             key = secrets.token_hex(16)
             u = create_user(session, name="admin", api_key=key, role="admin", seniority="lead")
             print("Created default admin. API key:", u.api_key)
+        
+        # Seed initial rules if none exist
+        if not session.exec(select(Rule)).first():
+            seed_rules_list = [
+                {"name": "Block fork bomb", "pattern": r":\(\)\{\ :\|:\&\ \}\;:", "action": "AUTO_REJECT", "priority": 1, "threshold": 2},
+                {"name": "Block rm -rf /", "pattern": r"rm\s+-rf\s+/", "action": "AUTO_REJECT", "priority": 2, "threshold": 2},
+                {"name": "Block mkfs commands", "pattern": r"mkfs\.", "action": "AUTO_REJECT", "priority": 3, "threshold": 2},
+                {"name": "Auto-accept git operations", "pattern": r"git\s+(status|log|diff)", "action": "AUTO_ACCEPT", "priority": 10, "threshold": 1},
+                {"name": "Auto-accept safe read commands", "pattern": r"^(ls|cat|pwd|echo)", "action": "AUTO_ACCEPT", "priority": 11, "threshold": 1},
+            ]
+            for rule_data in seed_rules_list:
+                rule = Rule(**rule_data)
+                session.add(rule)
+            session.commit()
+            print(f"✅ Seeded {len(seed_rules_list)} initial rules")
 
 # dependency to get user from API key
 def get_current_user(x_api_key: Optional[str] = Header(None)):
