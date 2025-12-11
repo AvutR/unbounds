@@ -9,16 +9,32 @@ export default function Dashboard({apiKey, onLogout}) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    Promise.all([
-      client.get("/commands"),
-      client.get("/users") // Get current user info if endpoint exists
-    ]).then(([cmds, usr]) => {
-      setCommands(cmds.data || cmds.data);
-      setUser(usr.data);
-    }).catch(e => {
-      console.error(e);
-      client.get("/commands").then(r => setCommands(r.data)).catch(console.error);
-    }).finally(() => setLoading(false));
+    const fetchAll = async () => {
+      try {
+        const [cmdsRes, userRes] = await Promise.allSettled([
+          client.get("/commands"),
+          client.get("/users/me")
+        ]);
+
+        if (cmdsRes.status === "fulfilled") setCommands(cmdsRes.value.data || []);
+        else {
+          console.error("Failed to load commands:", cmdsRes.reason);
+          setCommands([]);
+        }
+
+        if (userRes.status === "fulfilled") setUser(userRes.value.data || null);
+        else {
+          // No user endpoint or failed; show a friendly empty state instead of loading forever
+          console.warn("Failed to load user info:", userRes.reason);
+          setUser(null);
+        }
+      } catch (e) {
+        console.error("Unexpected fetch error:", e);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchAll();
   }, []);
 
   const getStatusBadge = (status) => {
