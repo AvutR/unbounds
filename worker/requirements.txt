@@ -1,0 +1,4 @@
+sqlmodel==0.0.8
+aiohttp==3.8.5
+python-dotenv==1.0.0
+psycopg2-binary==2.9.9
