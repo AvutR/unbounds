@@ -2,16 +2,24 @@
 TO TRY OUT:
 
 Links: 
-https://unbounds-production.up.railway.app/docs
-https://unbounds.vercel.app/
+
+To populate DB: https://unbounds-production.up.railway.app/docs
+
+To interact with frontend(mock commands): https://unbounds.vercel.app/
+
+To view video: https://drive.google.com/drive/folders/1tANyrn7s4aP5AGnUUB5Kt0PfiXVkb-gG?usp=sharing
 
 Sample Keys:
 
 Admin:
 db5a787ee0d5c15df365423c21aa65e0
 
-Sample User1:
-4a4260ca904c982f0d61c2a82e4d9739
+Senior:
+120cb523ce6086b8d7c3feb8cbcf08b7
+
+Junior:
+87c1f9547bb3da8f6a5849528e08ffb2
+
 
 
 A complete Command Gateway system: FastAPI backend, approval worker, React frontend.
