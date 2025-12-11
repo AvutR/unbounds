@@ -1,6 +1,7 @@
 # main.py
 import uvicorn, os, secrets, json
 from fastapi import FastAPI, Depends, HTTPException, Header
+from fastapi.middleware.cors import CORSMiddleware
 from db import init_db, get_session
 from sqlmodel import Session
 from crud import get_user_by_api_key, create_user, add_rule, match_rule, create_command
@@ -12,6 +13,15 @@ from typing import Optional
 from sqlmodel import select
 
 app = FastAPI(title="Command Gateway API")
+
+# Enable CORS for frontend
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Allow all origins (restrict in production)
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 @app.on_event("startup")
 def on_startup():
