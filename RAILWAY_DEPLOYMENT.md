@@ -6,8 +6,7 @@ This guide covers deploying Command Gateway on Railway (recommended for producti
 
 1. Railway account (https://railway.app)
 2. GitHub repo with the codebase
-3. Telegram bot token and chat ID (see README.md)
-4. SendGrid API key
+3. SendGrid API key
 
 ## Architecture on Railway
 
@@ -49,8 +48,6 @@ In the backend service settings, add:
 
 ```
 SENDGRID_API_KEY=sg-...
-TELEGRAM_BOT_TOKEN=123456:ABC...
-TELEGRAM_CHAT_ID=-100123456789
 ```
 
 The `DATABASE_URL` will be auto-populated from the Postgres plugin.
@@ -81,8 +78,6 @@ WORKER_MODE=api
 BACKEND_URL=https://<your-backend-service-name>.railway.app
 WORKER_API_KEY=<paste-the-admin-key-from-step-4>
 SENDGRID_API_KEY=sg-...
-TELEGRAM_BOT_TOKEN=123456:ABC...
-TELEGRAM_CHAT_ID=-100123456789
 ```
 
 To find the backend URL:

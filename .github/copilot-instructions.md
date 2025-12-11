@@ -12,7 +12,7 @@
 
 ### Three-Service Design
 - **Backend** (`backend/main.py`): REST API, all business logic, supports SQLite (Render) or PostgreSQL (Railway)
-- **Worker** (`worker/worker.py`): Async background job that checks expiring approvals every 60s, escalates/rejects them, sends Telegram notifications
+- **Worker** (`worker/worker.py`): Async background job that checks expiring approvals every 60s, escalates/rejects them
   - **Shared DB mode**: reads SQLite directly from Render's persistent disk
   - **API mode**: calls backend HTTP endpoints (Railway, no shared disk)
 - **Frontend** (`frontend/src/`): React SPA, minimal login + command submission + history view
@@ -23,9 +23,9 @@
 1. User submits command via `POST /commands` with API key
 2. Backend matches command text against **Rule** patterns (regex, ordered by priority)
 3. Rule's action determines outcome:
-   - **AUTO_ACCEPT** → immediately execute, deduct credits, log event, send Telegram
+   - **AUTO_ACCEPT** → immediately execute, deduct credits, log event, send email notification
    - **AUTO_REJECT** → mark rejected, log event
-   - **REQUIRE_APPROVAL** → create Approval record with threshold (default 2), notify Telegram
+   - **REQUIRE_APPROVAL** → create Approval record with threshold (default 2), send email notification
 4. If pending approval: approvers vote via `POST /approvals/{id}/vote`
    - Once threshold votes reached → execute command, mark approval resolved
    - If threshold rejections reached → mark rejected
@@ -70,14 +70,14 @@ npm run dev
 1. **Backend**: Render Web Service, set root to `backend/`, attach 1GB persistent disk at `/data`, mount `DATABASE_URL=/data/db.sqlite`
 2. **Worker**: Render background job or service, same disk, same env
 3. **Frontend**: Vercel, root `frontend/`, set `VITE_API_URL` env to backend URL
-4. **External services**: Create SendGrid account (email), Telegram bot (chat notifications), set env vars
+4. **External services**: Create SendGrid account (email), set env vars
 
 ### Deployment (Railway + Vercel) — Alternative
 Railway does NOT provide persistent disk sharing, so use API-mode worker instead:
 1. **Backend**: Railway Service, set root to `backend/`, attach PostgreSQL plugin (auto-provisions `DATABASE_URL`)
 2. **Worker**: Railway Service, set root to `worker/`, set `WORKER_MODE=api`, `BACKEND_URL=<backend-url>`, `WORKER_API_KEY=<admin-key>`
 3. **Frontend**: Vercel, root `frontend/`, set `VITE_API_URL=https://your-backend.railway.app`
-4. **External services**: SendGrid + Telegram (same as above)
+4. **External services**: SendGrid (email notifications)
 
 **Env vars to configure:**
 
@@ -85,8 +85,6 @@ Railway does NOT provide persistent disk sharing, so use API-mode worker instead
 ```
 DATABASE_URL=/data/db.sqlite
 SENDGRID_API_KEY=...
-TELEGRAM_BOT_TOKEN=...
-TELEGRAM_CHAT_ID=...
 ```
 
 **Railway (PostgreSQL + API-mode worker):**
@@ -95,8 +93,6 @@ Backend:
 ```
 DATABASE_URL=postgresql://user:pass@host:port/db  # Auto-provisioned by Railway's Postgres plugin
 SENDGRID_API_KEY=...
-TELEGRAM_BOT_TOKEN=...
-TELEGRAM_CHAT_ID=...
 ```
 
 Worker:
@@ -105,15 +101,13 @@ WORKER_MODE=api
 BACKEND_URL=https://your-backend.railway.app
 WORKER_API_KEY=<copy-admin-key-from-backend-startup>
 SENDGRID_API_KEY=...
-TELEGRAM_BOT_TOKEN=...
-TELEGRAM_CHAT_ID=...
 ```
 
 ### Testing Workflows
 - **Submit safe command** (e.g., `ls -la`): expect auto-accept if no rules, or approval request if REQUIRE_APPROVAL rule
 - **Submit dangerous command** (e.g., `rm -rf /`): expect auto-reject if AUTO_REJECT rule exists
 - **Voting**: approver votes APPROVE → command executes if threshold met
-- **Escalation**: approval not resolved in 10 min → worker marks escalated, Telegram alert; after 60 min → auto-rejected
+- **Escalation**: approval not resolved in 10 min → worker marks escalated, email alert; after 60 min → auto-rejected
 
 ---
 
@@ -138,8 +132,7 @@ TELEGRAM_CHAT_ID=...
 - Commands fail if user has ≤ 0 credits (returns 402 Payment Required)
 
 ### Notification Strategy
-- **Telegram**: best-effort async via aiohttp; notifications fire on: command execution, approval request, approval granted/escalated/rejected, escalation timeout
-- **SendGrid**: email notifications (stub in code, not actively used in main.py yet)
+- **SendGrid**: email notifications via aiohttp, fire-and-forget pattern (no retry logic)
 - Notifications are **non-blocking** — failures logged to stderr, don't block API response
 
 ### Database & Sessions
@@ -162,9 +155,8 @@ TELEGRAM_CHAT_ID=...
 ## Integration Points & Dependencies
 
 ### Backend → External APIs
-- **Telegram API** (`notifications.py::send_telegram`): POST to `https://api.telegram.org/bot{token}/sendMessage`
 - **SendGrid API** (`notifications.py::send_email`): POST to `https://api.sendgrid.com/v3/mail/send` with Bearer token
-- Both async via aiohttp, fire-and-forget pattern (no retry logic)
+- Async via aiohttp, fire-and-forget pattern (no retry logic)
 
 ### Frontend → Backend API
 - Base URL: `import.meta.env.VITE_API_URL` (env var) or default `http://localhost:10000`
@@ -190,7 +182,7 @@ TELEGRAM_CHAT_ID=...
 | `backend/main.py` | FastAPI app, all endpoints | `api_submit_command()` (rule matching → action), `api_vote()` (approval voting), `get_current_user()` (auth) |
 | `backend/crud.py` | Business logic | `match_rule()` (regex priority matching), `add_rule()` (conflict detection), `create_command()` (event logging) |
 | `backend/models.py` | Data schema | User, Rule, Command, Approval, ApprovalVote, EventLog |
-| `backend/notifications.py` | Telegram/SendGrid | `send_telegram()`, `send_email()` (async stubs) |
+| `backend/notifications.py` | Email notifications | `send_email()` (async) |
 | `worker/worker.py` | Approval scheduler | `check_approvals()` (escalation/timeout logic) |
 | `frontend/src/api.js` | API client | `apiClient(apiKey)` — axios instance with x-api-key header |
 | `frontend/src/App.jsx` | Auth routing | login → dashboard swap |
@@ -214,7 +206,7 @@ TELEGRAM_CHAT_ID=...
 - To add new rule properties: update Rule model in `models.py`, add fields to CreateRule schema
 
 ### Adding Notifications
-- Use async functions in `notifications.py::send_telegram()` or `send_email()`
+- Use async functions in `notifications.py::send_email()`
 - Call via `asyncio.create_task()` in `main.py` endpoints (non-blocking)
 - Fire-and-forget pattern (no await, no retry logic)
 
@@ -239,7 +231,7 @@ TELEGRAM_CHAT_ID=...
 5. **API key rotation:** No built-in rotation; admins must manually update User.api_key in DB
 6. **Time-based rules:** Logic is simple string comparison ("09:00" ≤ HH:MM ≤ "18:00"); no timezone support
 7. **Conflict detection:** Currently checks if two rules both match "rm -rf /" test string; not exhaustive
-8. **Notifications best-effort:** Failed Telegram/SendGrid calls don't block API or retry; check logs for failures
+8. **Email notifications best-effort:** Failed SendGrid calls don't block API or retry; check logs for failures
 9. **EventLog unbounded:** No pruning; table grows with every action (consider periodic cleanup for long-running instances)
 
 ---

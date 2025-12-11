@@ -10,7 +10,6 @@
 import os
 import asyncio
 from datetime import datetime, timedelta
-from notifications import send_telegram
 
 WORKER_MODE = os.environ.get("WORKER_MODE", "api").lower()
 
@@ -39,7 +38,6 @@ if WORKER_MODE == "db":
                     session.add(p)
                     session.add(EventLog(event_type="APPROVAL_ESCALATED", user_id=p.requested_by, details=str(p.command_id)))
                     session.commit()
-                    await send_telegram(f"Approval {p.id} escalated for command {p.command_id}")
             # Auto-reject very old approvals (60+ min)
             long_pending = session.exec(select(Approval).where(Approval.resolved==False).where(Approval.expires_at <= now - timedelta(minutes=60))).all()
             for lp in long_pending:
@@ -47,7 +45,6 @@ if WORKER_MODE == "db":
                 session.add(lp)
                 session.add(EventLog(event_type="APPROVAL_AUTO_REJECTED", user_id=lp.requested_by, details=str(lp.command_id)))
                 session.commit()
-                await send_telegram(f"Approval {lp.id} auto-rejected due to timeout for command {lp.command_id}")
 
 else:
     # API mode (Railway, multi-instance) - default
@@ -83,7 +80,7 @@ else:
                             headers=headers
                         ) as resp:
                             if resp.status == 200:
-                                await send_telegram(f"Approval {appr['id']} escalated for command {appr['command_id']}")
+                                pass
                     
                     # Auto-reject if very old (60+ min past expiry)
                     if expires_at <= now - timedelta(minutes=60) and not appr.get("resolved"):
@@ -92,7 +89,7 @@ else:
                             headers=headers
                         ) as resp:
                             if resp.status == 200:
-                                await send_telegram(f"Approval {appr['id']} auto-rejected due to timeout for command {appr['command_id']}")
+                                pass
             
             except Exception as e:
                 print(f"Worker API error: {e}")

@@ -7,7 +7,7 @@ from crud import get_user_by_api_key, create_user, add_rule, match_rule, create_
 from schemas import CreateUser, CreateRule, SubmitCommand
 from models import User, Rule, Command, Approval, ApprovalVote, EventLog
 from datetime import datetime, timedelta
-from notifications import send_telegram, send_email
+from notifications import send_email
 from typing import Optional
 from sqlmodel import select
 
@@ -98,12 +98,6 @@ def api_submit_command(cmd: SubmitCommand, user: User = Depends(get_current_user
                 session.add(user); session.add(command)
                 session.add(EventLog(event_type="COMMAND_EXECUTED", user_id=user.id, details=cmd.command_text))
                 session.commit()
-                # notify via telegram
-                try:
-                    import asyncio
-                    asyncio.create_task(send_telegram(f"Command executed by {user.name}: {cmd.command_text}"))
-                except:
-                    pass
                 return {"status": "executed", "new_balance": user.credits, "result": command.result}
             except Exception as e:
                 session.rollback()
@@ -117,12 +111,6 @@ def api_submit_command(cmd: SubmitCommand, user: User = Depends(get_current_user
             session.add(approval)
             session.add(EventLog(event_type="APPROVAL_REQUEST_CREATED", user_id=user.id, details=str(command.id)))
             session.commit()
-            # notify (worker will handle notifications too)
-            try:
-                import asyncio
-                asyncio.create_task(send_telegram(f"Approval required for command {command.id}: {cmd.command_text}"))
-            except:
-                pass
             return {"status": "pending_approval", "approval_id": approval.id}
 
 @app.get("/commands")
@@ -165,11 +153,6 @@ def api_vote(approval_id: int, vote: str, user: User = Depends(get_current_user)
             session.add(u); session.add(cmd); session.add(appr)
             session.add(EventLog(event_type="APPROVAL_GRANTED", user_id=user.id, details=str(cmd.id)))
             session.commit()
-            try:
-                import asyncio
-                asyncio.create_task(send_telegram(f"Approval granted for command {cmd.id}"))
-            except:
-                pass
             return {"status":"executed", "new_balance": u.credits}
         elif rejects >= appr.threshold_required:
             appr.resolved = True

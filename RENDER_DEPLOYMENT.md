@@ -6,8 +6,7 @@ This guide covers deploying Command Gateway on Render (recommended for simplicit
 
 1. Render account (https://render.com)
 2. GitHub repo with the codebase
-3. Telegram bot token and chat ID
-4. SendGrid API key
+3. SendGrid API key
 
 ## Architecture on Render
 
@@ -54,8 +53,6 @@ In the backend service, go to "Environment" and add:
 ```
 DATABASE_URL=/data/db.sqlite
 SENDGRID_API_KEY=sg-...
-TELEGRAM_BOT_TOKEN=123456:ABC...
-TELEGRAM_CHAT_ID=-100123456789
 ```
 
 The backend will auto-create the SQLite database on the persistent disk at startup.
@@ -97,8 +94,6 @@ In the worker service, go to "Environment" and add:
 ```
 DATABASE_URL=/data/db.sqlite
 SENDGRID_API_KEY=sg-...
-TELEGRAM_BOT_TOKEN=123456:ABC...
-TELEGRAM_CHAT_ID=-100123456789
 ```
 
 Note: No `WORKER_MODE` needed; it defaults to `db` mode when `DATABASE_URL` is a local SQLite path.

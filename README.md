@@ -2,7 +2,7 @@
 
 A complete Command Gateway system: FastAPI backend, approval worker, React frontend.
 
-**Features:** API-key auth, credits, rule engine (regex), approvals, voting thresholds, escalation, time-based rules, notifications (Telegram + SendGrid), analytics.
+**Features:** API-key auth, credits, rule engine (regex), approvals, voting thresholds, escalation, time-based rules, email notifications, analytics.
 
 See `/backend`, `/worker`, `/frontend` folders for service implementations.
 
@@ -63,7 +63,6 @@ Then open `http://localhost:5173` and paste the admin API key.
 ### Worker (`worker/worker.py`)
 - **Background job** that runs every 60s
 - Checks pending approvals: escalates expired ones, auto-rejects very old ones (60+ min)
-- Sends Telegram notifications for escalations and timeouts
 - **Two modes:**
   - **Shared DB mode** (Render): reads SQLite directly from persistent disk
   - **API mode** (Railway): calls backend endpoints via HTTP (default)
@@ -103,17 +102,12 @@ Then open `http://localhost:5173` and paste the admin API key.
 4. **SendGrid** (email notifications)
    - Create account → generate API key → set `SENDGRID_API_KEY` env
 
-5. **Telegram** (chat notifications)
-   - Chat @BotFather → `/newbot` → get `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID`
-
 ### Environment Variables
 
 **Render (SQLite + shared disk):**
 ```
 DATABASE_URL=/data/db.sqlite
 SENDGRID_API_KEY=sg-...
-TELEGRAM_BOT_TOKEN=123456:ABC...
-TELEGRAM_CHAT_ID=-100123456789
 ```
 
 **Railway (PostgreSQL + API-mode worker):**
@@ -122,8 +116,6 @@ Backend:
 ```
 DATABASE_URL=postgresql://...         # Auto-provisioned by Railway Postgres
 SENDGRID_API_KEY=sg-...
-TELEGRAM_BOT_TOKEN=123456:ABC...
-TELEGRAM_CHAT_ID=-100123456789
 ```
 
 Worker:
@@ -132,8 +124,6 @@ WORKER_MODE=api
 BACKEND_URL=https://your-backend.railway.app
 WORKER_API_KEY=<admin-key-from-backend-logs>
 SENDGRID_API_KEY=sg-...
-TELEGRAM_BOT_TOKEN=123456:ABC...
-TELEGRAM_CHAT_ID=-100123456789
 ```
 
 **Frontend (both platforms):**
@@ -188,7 +178,7 @@ Then:
 3. Create a member user via API (or use admin)
 4. Submit `ls -la` → should auto-accept if no rules
 5. Submit `rm -rf /` → should reject if rule exists
-6. Submit `unknown-command` → should create approval, Telegram alert
+6. Submit `unknown-command` → should create approval request
 
 ---
 
@@ -236,7 +226,7 @@ command-gateway/
 - Worker uses shared SQLite DB (works on Render with persistent disk). For Railway (no shared disk), modify worker to call backend API endpoints instead.
 - Credits are user balance; deducted on command execution. No credit refunds on rejection.
 - EventLog captures all significant events for audit/analytics.
-- Notifications are best-effort (no retry on Telegram/SendGrid failure; logged to stderr).
+- Email notifications via SendGrid are best-effort (no retry on failure; logged to stderr).
 
 ---
 
