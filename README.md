@@ -1,11 +1,18 @@
 # Command Gateway
 TO TRY OUT:
-Link: https://unbounds.vercel.app/
+
+Links: 
+https://unbounds-production.up.railway.app/docs
+https://unbounds.vercel.app/
+
 Sample Keys:
+
 Admin:
 db5a787ee0d5c15df365423c21aa65e0
+
 Sample User1:
 4a4260ca904c982f0d61c2a82e4d9739
+
 
 A complete Command Gateway system: FastAPI backend, approval worker, React frontend.
 
