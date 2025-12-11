@@ -45,23 +45,47 @@ def add_rule(session: Session, pattern: str, action: str, priority: int = 100, *
             pass
     return rule, conflicts
 
-def match_rule(session: Session, command_text: str, nowtime):
+def match_rule(session: Session, command_text: str, nowtime, user = None):
+    """Match command against rules in priority order.
+    
+    Args:
+        session: DB session
+        command_text: Command to match
+        nowtime: Current datetime for time-based rules
+        user: Current user (optional, for seniority overrides)
+    
+    Returns:
+        (rule, action) tuple where action may be overridden by seniority or time
+    """
     rules = list_rules(session)
     for r in rules:
         try:
-            if r.active_hours_start and r.active_hours_end:
-                # check time
-                start = r.active_hours_start
-                end = r.active_hours_end
-                hhmm = nowtime.strftime("%H:%M")
-                if not (start <= hhmm <= end):
-                    # convert action to REQUIRE_APPROVAL temporarily
-                    action = "REQUIRE_APPROVAL"
-                else:
-                    action = r.action
-            else:
-                action = r.action
             if re.search(r.pattern, command_text):
+                action = r.action
+                
+                # Time-based override: outside active hours -> REQUIRE_APPROVAL
+                if r.active_hours_start and r.active_hours_end:
+                    start = r.active_hours_start
+                    end = r.active_hours_end
+                    hhmm = nowtime.strftime("%H:%M")
+                    if not (start <= hhmm <= end):
+                        action = "REQUIRE_APPROVAL"
+                
+                # Seniority-based override: adjust threshold or action
+                if user and r.seniority_overrides:
+                    try:
+                        overrides = json.loads(r.seniority_overrides)
+                        if user.seniority in overrides:
+                            override = overrides[user.seniority]
+                            # Override can specify: action, threshold, or both
+                            if "action" in override:
+                                action = override["action"]
+                            # Store adjusted threshold on rule object (temp)
+                            if "threshold" in override:
+                                r.threshold = override["threshold"]
+                    except json.JSONDecodeError:
+                        pass
+                
                 return r, action
         except Exception:
             continue

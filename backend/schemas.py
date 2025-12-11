@@ -1,6 +1,6 @@
 # schemas.py
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, Dict, Any
 
 class CreateUser(BaseModel):
     name: str
@@ -14,6 +14,7 @@ class CreateRule(BaseModel):
     threshold: Optional[int] = None
     active_hours_start: Optional[str] = None
     active_hours_end: Optional[str] = None
+    seniority_overrides: Optional[Dict[str, Any]] = None
 
 class SubmitCommand(BaseModel):
     command_text: str

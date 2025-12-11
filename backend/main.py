@@ -1,5 +1,5 @@
 # main.py
-import uvicorn, os, secrets, json
+import uvicorn, os, secrets, json, asyncio
 from fastapi import FastAPI, Depends, HTTPException, Header
 from fastapi.middleware.cors import CORSMiddleware
 from db import init_db, get_session
@@ -112,8 +112,8 @@ def api_submit_command(cmd: SubmitCommand, user: User = Depends(get_current_user
             raise HTTPException(status_code=402, detail="No credits")
         # create record
         command = create_command(session, user, cmd.command_text)
-        # match rule
-        r, action = match_rule(session, cmd.command_text, datetime.utcnow())
+        # match rule (pass user for seniority overrides)
+        r, action = match_rule(session, cmd.command_text, datetime.utcnow(), user)
         if not r:
             # default to require approval for unknown
             action = "REQUIRE_APPROVAL"
@@ -149,6 +149,22 @@ def api_submit_command(cmd: SubmitCommand, user: User = Depends(get_current_user
             session.add(approval)
             session.add(EventLog(event_type="APPROVAL_REQUEST_CREATED", user_id=user.id, details=str(command.id)))
             session.commit()
+            
+            # Notify approvers asynchronously
+            approvers = session.exec(select(User).where(User.role.in_(["admin", "approver"]))).all()
+            for approver in approvers:
+                subject = f"Command Approval Required (#{approval.id})"
+                text = f"""A command requires your approval:
+
+Command: {cmd.command_text}
+Submitted by: {user.name}
+Approval ID: {approval.id}
+Votes required: {threshold}
+Expires at: {expires_at.strftime('%Y-%m-%d %H:%M UTC')}
+
+Please review and vote."""
+                asyncio.create_task(send_email(approver.name, subject, text))
+            
             return {"status": "pending_approval", "approval_id": approval.id}
 
 @app.get("/commands")
@@ -191,11 +207,34 @@ def api_vote(approval_id: int, vote: str, user: User = Depends(get_current_user)
             session.add(u); session.add(cmd); session.add(appr)
             session.add(EventLog(event_type="APPROVAL_GRANTED", user_id=user.id, details=str(cmd.id)))
             session.commit()
+            
+            # Notify the command submitter
+            subject = f"Command Approved and Executed (#{appr.id})"
+            text = f"""Your command has been approved and executed:
+
+Command: {cmd.command_text}
+Status: EXECUTED
+Result: {cmd.result}
+New credit balance: {u.credits}"""
+            asyncio.create_task(send_email(u.name, subject, text))
+            
             return {"status":"executed", "new_balance": u.credits}
         elif rejects >= appr.threshold_required:
             appr.resolved = True
+            cmd = session.get(Command, appr.command_id)
             session.add(appr); session.add(EventLog(event_type="APPROVAL_REJECTED", user_id=user.id, details=str(appr.command_id)))
             session.commit()
+            
+            # Notify the command submitter
+            submitter = session.get(User, cmd.user_id)
+            subject = f"Command Rejected (#{appr.id})"
+            text = f"""Your command has been rejected by approvers:
+
+Command: {cmd.command_text}
+Status: REJECTED
+Reason: Approval threshold for rejections reached"""
+            asyncio.create_task(send_email(submitter.name, subject, text))
+            
             return {"status":"rejected"}
         else:
             return {"status":"pending", "approves": approves, "rejects": rejects}
