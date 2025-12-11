@@ -10,6 +10,10 @@
 import os
 import asyncio
 from datetime import datetime, timedelta
+import sys
+
+# Add parent directory to path so we can import backend models
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'backend'))
 
 WORKER_MODE = os.environ.get("WORKER_MODE", "api").lower()
 

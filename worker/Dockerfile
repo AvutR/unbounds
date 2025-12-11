@@ -6,10 +6,8 @@ COPY requirements.txt .
 
 RUN pip install --no-cache-dir -r requirements.txt
 
-# For DB mode, copy backend code (one level up from worker/)
-COPY ../backend/models.py ./models.py
-COPY ../backend/notifications.py ./notifications.py
-
 COPY worker.py .
 
+# At runtime, Python will find models.py in the same directory (set via PYTHONPATH or symlink)
 CMD ["python", "worker.py"]
+
