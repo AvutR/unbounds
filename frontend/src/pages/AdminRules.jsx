@@ -39,18 +39,28 @@ export default function AdminRules({client}) {
     setSuccess(false);
     
     try {
-      await client.post("/rules", {
+      const res = await client.post("/rules", {
         pattern,
         action,
         threshold: action === "REQUIRE_APPROVAL" ? threshold : undefined,
         priority
       });
+      
+      // Show conflicts warning if detected
+      if (res.data.conflicts && res.data.conflicts.length > 0) {
+        const conflictList = res.data.conflicts.map(c => `${c.pattern} (${c.action})`).join(", ");
+        setSuccess(true);
+        setError(`⚠️ Rule added, but conflicts detected with: ${conflictList}`);
+        setTimeout(() => setError(null), 5000);
+      } else {
+        setSuccess(true);
+        setTimeout(() => setSuccess(false), 3000);
+      }
+      
       setPattern("");
       setAction("AUTO_ACCEPT");
       setThreshold(2);
       setPriority(0);
-      setSuccess(true);
-      setTimeout(() => setSuccess(false), 3000);
       await fetchRules();
     } catch (e) {
       const detail = e.response?.data?.detail || e.message;
